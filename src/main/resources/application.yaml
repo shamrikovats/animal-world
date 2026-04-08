@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: animalworld
+  datasource:
+    url: jdbc:postgresql://localhost:5432/database
+    username: user
+    password: supersecret
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+
