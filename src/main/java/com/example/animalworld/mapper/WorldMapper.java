@@ -26,6 +26,7 @@ public class WorldMapper {
                 entity.id(),
                 entity.name(),
                 entity.description(),
+                entity.createdAt(),
                 entity.status()
         );
     }

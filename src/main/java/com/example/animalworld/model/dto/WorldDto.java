@@ -1,8 +1,9 @@
 package com.example.animalworld.model.dto;
 
 import com.example.animalworld.model.WorldStatus;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+
+import java.time.Instant;
 
 /**
  * @author Shamrikova Tatiana
@@ -10,11 +11,11 @@ import jakarta.validation.constraints.NotNull;
 public record WorldDto(
         @NotNull
         Integer id,
-        @NotBlank
         String name,
-        @NotBlank
         String description,
-        @NotBlank
+        @NotNull
+        Instant createdAt,
+        @NotNull
         WorldStatus status
 ) {
 }

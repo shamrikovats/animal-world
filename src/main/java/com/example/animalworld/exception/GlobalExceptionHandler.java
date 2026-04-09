@@ -5,11 +5,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -25,10 +28,18 @@ public class GlobalExceptionHandler {
             WorldNotFoundByIdException exception,
             HttpServletRequest request
     ) {
-        return buildErrorResponse(
-                HttpStatus.NOT_FOUND,
-                exception.getMessage()
-        );
+        return buildErrorResponse(HttpStatus.NOT_FOUND, exception.getMessage());
+    }
+
+    @ExceptionHandler({
+            SpeciesNotFoundByIdException.class,
+            PlantSpeciesNotFoundByIdException.class
+    })
+    public ResponseEntity<ApiErrorDto> handleReferenceNotFound(
+            RuntimeException exception,
+            HttpServletRequest request
+    ) {
+        return buildErrorResponse(HttpStatus.NOT_FOUND, exception.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -41,10 +52,8 @@ public class GlobalExceptionHandler {
             details.put(fieldError.getField(), fieldError.getDefaultMessage());
         }
 
-        return buildErrorResponse(
-                HttpStatus.BAD_REQUEST,
-                "Validation failed"
-        );
+        String message = details.isEmpty() ? "Validation failed" : details.toString();
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, message);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
@@ -54,8 +63,20 @@ public class GlobalExceptionHandler {
     ) {
         return buildErrorResponse(
                 HttpStatus.CONFLICT,
-                "Request violates database constraints"
+                extractMostRelevantMessage(exception, "Request violates database constraints")
         );
+    }
+
+    @ExceptionHandler({
+            IllegalArgumentException.class,
+            HttpMessageNotReadableException.class,
+            BadSqlGrammarException.class
+    })
+    public ResponseEntity<ApiErrorDto> handleBadRequest(
+            Exception exception,
+            HttpServletRequest request
+    ) {
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, exception.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
@@ -63,10 +84,7 @@ public class GlobalExceptionHandler {
             Exception exception,
             HttpServletRequest request
     ) {
-        return buildErrorResponse(
-                HttpStatus.INTERNAL_SERVER_ERROR,
-                "Unexpected server error"
-        );
+        return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected server error");
     }
 
     private ResponseEntity<ApiErrorDto> buildErrorResponse(
@@ -81,5 +99,19 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.status(status).body(body);
+    }
+
+    private String extractMostRelevantMessage(Throwable throwable, String fallback) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof SQLException sqlException) {
+                return sqlException.getMessage();
+            }
+            if (current.getMessage() != null && !current.getMessage().isBlank()) {
+                fallback = current.getMessage();
+            }
+            current = current.getCause();
+        }
+        return fallback;
     }
 }
