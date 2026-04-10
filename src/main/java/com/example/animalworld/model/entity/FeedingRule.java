@@ -14,4 +14,26 @@ public record FeedingRule(
         FoodType foodType,
         Integer probability
 ) {
+    public Key key() {
+        return new Key(speciesId, preySpeciesId, preyPlantSpeciesId);
+    }
+
+    public FeedingRule withWorldId(Integer worldId) {
+        return new FeedingRule(
+                id,
+                worldId,
+                speciesId,
+                preySpeciesId,
+                preyPlantSpeciesId,
+                foodType,
+                probability
+        );
+    }
+
+    public record Key(
+            Integer speciesId,
+            Integer preySpeciesId,
+            Integer preyPlantSpeciesId
+    ) {
+    }
 }

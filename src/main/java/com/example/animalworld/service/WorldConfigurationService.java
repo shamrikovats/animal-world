@@ -12,9 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * @author Shamrikova Tatiana
@@ -56,29 +53,17 @@ public class WorldConfigurationService {
             List<FeedingRule> feedingRulePatches
     ) {
         worldLookupService.findById(worldId);
-        validationService.validateSpeciesConfigurations(speciesConfigurationPatches);
-        validationService.validatePlantConfigurations(plantConfigurationPatches);
-        validationService.validateFeedingRules(feedingRulePatches);
+        validateConfigurationPatches(speciesConfigurationPatches, plantConfigurationPatches, feedingRulePatches);
 
-        WorldSettings settings = mergeService.mergeSettings(
-                worldSettingsRepository.findDefault(),
-                settingsPatch,
-                worldId
-        );
+        WorldSettings settings = mergeService.mergeSettings(worldSettingsRepository.findDefault(), settingsPatch, worldId);
         List<SpeciesConfiguration> speciesConfigurations = mergeService.mergeSpeciesConfigurations(
-                speciesConfigurationRepository.findAllDefaults(),
-                speciesConfigurationPatches,
-                worldId
+                speciesConfigurationRepository.findAllDefaults(), speciesConfigurationPatches, worldId
         );
         List<PlantSpeciesConfiguration> plantConfigurations = mergeService.mergePlantConfigurations(
-                plantSpeciesConfigurationRepository.findAllDefaults(),
-                plantConfigurationPatches,
-                worldId
+                plantSpeciesConfigurationRepository.findAllDefaults(), plantConfigurationPatches, worldId
         );
         List<FeedingRule> feedingRules = mergeService.mergeFeedingRules(
-                feedingRuleRepository.findAllDefaults(),
-                feedingRulePatches,
-                worldId
+                feedingRuleRepository.findAllDefaults(), feedingRulePatches, worldId
         );
 
         saveConfiguration(worldId, settings, speciesConfigurations, plantConfigurations, feedingRules);
@@ -111,13 +96,13 @@ public class WorldConfigurationService {
 
     public WorldSettings getSettings(Integer worldId) {
         ensureMaterialized(worldId);
-        return worldSettingsRepository.findByWorldId(worldId).orElseThrow();
+        return findSettingsRequired(worldId);
     }
 
     @Transactional
     public WorldSettings updateSettings(Integer worldId, WorldSettings settingsPatch) {
         ensureMaterialized(worldId);
-        WorldSettings merged = mergeService.mergeSettings(getSettings(worldId), settingsPatch, worldId);
+        WorldSettings merged = mergeService.mergeSettings(findSettingsRequired(worldId), settingsPatch, worldId);
         worldSettingsRepository.upsert(merged);
         return merged;
     }
@@ -133,7 +118,7 @@ public class WorldConfigurationService {
         validationService.validateSpeciesPath(speciesId, patch.speciesId());
         validationService.validateSpeciesConfigurations(List.of(patch));
 
-        SpeciesConfiguration current = speciesConfigurationRepository.findByWorldIdAndSpeciesId(worldId, speciesId).orElseThrow();
+        SpeciesConfiguration current = findSpeciesConfigurationRequired(worldId, speciesId);
         SpeciesConfiguration merged = mergeService.mergeSpeciesConfiguration(current, patch, worldId);
         speciesConfigurationRepository.upsert(merged);
         return merged;
@@ -154,9 +139,7 @@ public class WorldConfigurationService {
         validationService.validatePlantPath(plantSpeciesId, patch.plantSpeciesId());
         validationService.validatePlantConfigurations(List.of(patch));
 
-        PlantSpeciesConfiguration current = plantSpeciesConfigurationRepository
-                .findByWorldIdAndPlantSpeciesId(worldId, plantSpeciesId)
-                .orElseThrow();
+        PlantSpeciesConfiguration current = findPlantConfigurationRequired(worldId, plantSpeciesId);
         PlantSpeciesConfiguration merged = mergeService.mergePlantConfiguration(current, patch, worldId);
         plantSpeciesConfigurationRepository.upsert(merged);
         return merged;
@@ -172,23 +155,8 @@ public class WorldConfigurationService {
         ensureMaterialized(worldId);
         validationService.validateFeedingRules(rules);
 
-        Map<FeedingRuleKey, FeedingRule> currentRules = feedingRuleRepository.findAllByWorldId(worldId).stream()
-                .collect(Collectors.toMap(this::toKey, Function.identity()));
-
         for (FeedingRule rule : rules) {
-            FeedingRuleKey key = toKey(rule);
-            FeedingRule existing = currentRules.get(key);
-            FeedingRule worldRule = new FeedingRule(
-                    existing == null ? null : existing.id(),
-                    worldId,
-                    rule.speciesId(),
-                    rule.preySpeciesId(),
-                    rule.preyPlantSpeciesId(),
-                    rule.foodType(),
-                    rule.probability()
-            );
-            feedingRuleRepository.upsertWorldRule(worldRule);
-            currentRules.put(key, worldRule);
+            feedingRuleRepository.upsertWorldRule(rule.withWorldId(worldId));
         }
 
         return feedingRuleRepository.findAllByWorldId(worldId);
@@ -207,14 +175,26 @@ public class WorldConfigurationService {
         feedingRuleRepository.replaceAllForWorld(worldId, feedingRules);
     }
 
-    private FeedingRuleKey toKey(FeedingRule rule) {
-        return new FeedingRuleKey(rule.speciesId(), rule.preySpeciesId(), rule.preyPlantSpeciesId());
+    private void validateConfigurationPatches(
+            List<SpeciesConfiguration> speciesConfigurationPatches,
+            List<PlantSpeciesConfiguration> plantConfigurationPatches,
+            List<FeedingRule> feedingRulePatches
+    ) {
+        validationService.validateSpeciesConfigurations(speciesConfigurationPatches);
+        validationService.validatePlantConfigurations(plantConfigurationPatches);
+        validationService.validateFeedingRules(feedingRulePatches);
     }
 
-    private record FeedingRuleKey(
-            Integer speciesId,
-            Integer preySpeciesId,
-            Integer preyPlantSpeciesId
-    ) {
+    private WorldSettings findSettingsRequired(Integer worldId) {
+        return worldSettingsRepository.findByWorldId(worldId).orElseThrow();
+    }
+
+    private SpeciesConfiguration findSpeciesConfigurationRequired(Integer worldId, Integer speciesId) {
+        return speciesConfigurationRepository.findByWorldIdAndSpeciesId(worldId, speciesId).orElseThrow();
+    }
+
+    private PlantSpeciesConfiguration findPlantConfigurationRequired(Integer worldId, Integer plantSpeciesId) {
+        return plantSpeciesConfigurationRepository.findByWorldIdAndPlantSpeciesId(worldId, plantSpeciesId)
+                .orElseThrow();
     }
 }

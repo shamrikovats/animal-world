@@ -62,8 +62,12 @@ public class FeedingRuleRepository {
     }
 
     public void upsertWorldRule(FeedingRule rule) {
-        deleteWorldRule(rule.worldId(), rule.speciesId(), rule.preySpeciesId(), rule.preyPlantSpeciesId());
-        insertWorldRule(rule);
+        if (rule.preySpeciesId() != null) {
+            upsertSpeciesRule(rule);
+            return;
+        }
+
+        upsertPlantRule(rule);
     }
 
     private void insertWorldRule(FeedingRule rule) {
@@ -91,30 +95,59 @@ public class FeedingRuleRepository {
                 .update();
     }
 
-    private void deleteWorldRule(Integer worldId, Integer speciesId, Integer preySpeciesId, Integer preyPlantSpeciesId) {
-        if (preySpeciesId != null) {
-            client.sql("""
-                            DELETE FROM feeding_species_rules
-                            WHERE world_id = :worldId
-                              AND species_id = :speciesId
-                              AND prey_species_id = :preySpeciesId
-                            """)
-                    .param("worldId", worldId)
-                    .param("speciesId", speciesId)
-                    .param("preySpeciesId", preySpeciesId)
-                    .update();
-            return;
-        }
-
+    private void upsertSpeciesRule(FeedingRule rule) {
         client.sql("""
-                        DELETE FROM feeding_species_rules
-                        WHERE world_id = :worldId
-                          AND species_id = :speciesId
-                          AND prey_plant_species_id = :preyPlantSpeciesId
+                        INSERT INTO feeding_species_rules (
+                            world_id,
+                            species_id,
+                            prey_species_id,
+                            prey_plant_species_id,
+                            probability
+                        )
+                        VALUES (
+                            :worldId,
+                            :speciesId,
+                            :preySpeciesId,
+                            :preyPlantSpeciesId,
+                            :probability
+                        )
+                        ON CONFLICT (world_id, species_id, prey_species_id)
+                        WHERE prey_species_id IS NOT NULL
+                        DO UPDATE SET probability = EXCLUDED.probability
                         """)
-                .param("worldId", worldId)
-                .param("speciesId", speciesId)
-                .param("preyPlantSpeciesId", preyPlantSpeciesId)
+                .param("worldId", rule.worldId())
+                .param("speciesId", rule.speciesId())
+                .param("preySpeciesId", rule.preySpeciesId())
+                .param("preyPlantSpeciesId", rule.preyPlantSpeciesId())
+                .param("probability", rule.probability())
+                .update();
+    }
+
+    private void upsertPlantRule(FeedingRule rule) {
+        client.sql("""
+                        INSERT INTO feeding_species_rules (
+                            world_id,
+                            species_id,
+                            prey_species_id,
+                            prey_plant_species_id,
+                            probability
+                        )
+                        VALUES (
+                            :worldId,
+                            :speciesId,
+                            :preySpeciesId,
+                            :preyPlantSpeciesId,
+                            :probability
+                        )
+                        ON CONFLICT (world_id, species_id, prey_plant_species_id)
+                        WHERE prey_plant_species_id IS NOT NULL
+                        DO UPDATE SET probability = EXCLUDED.probability
+                        """)
+                .param("worldId", rule.worldId())
+                .param("speciesId", rule.speciesId())
+                .param("preySpeciesId", rule.preySpeciesId())
+                .param("preyPlantSpeciesId", rule.preyPlantSpeciesId())
+                .param("probability", rule.probability())
                 .update();
     }
 
