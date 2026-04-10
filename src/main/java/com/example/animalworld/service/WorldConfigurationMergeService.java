@@ -116,15 +116,15 @@ public class WorldConfigurationMergeService {
             List<FeedingRule> patches,
             Integer worldId
     ) {
-        Map<FeedingRuleKey, FeedingRule> merged = defaults.stream()
-                .collect(Collectors.toMap(this::toKey, rule -> withWorldId(rule, worldId)));
+        Map<FeedingRule.Key, FeedingRule> merged = defaults.stream()
+                .collect(Collectors.toMap(FeedingRule::key, rule -> rule.withWorldId(worldId)));
 
         if (patches == null || patches.isEmpty()) {
             return sortFeedingRules(merged.values());
         }
 
         for (FeedingRule patch : patches) {
-            merged.put(toKey(patch), new FeedingRule(
+            merged.put(patch.key(), new FeedingRule(
                     null,
                     worldId,
                     patch.speciesId(),
@@ -196,28 +196,5 @@ public class WorldConfigurationMergeService {
                 configuration.weight(),
                 configuration.startCount()
         );
-    }
-
-    private FeedingRule withWorldId(FeedingRule rule, Integer worldId) {
-        return new FeedingRule(
-                rule.id(),
-                worldId,
-                rule.speciesId(),
-                rule.preySpeciesId(),
-                rule.preyPlantSpeciesId(),
-                rule.foodType(),
-                rule.probability()
-        );
-    }
-
-    private FeedingRuleKey toKey(FeedingRule rule) {
-        return new FeedingRuleKey(rule.speciesId(), rule.preySpeciesId(), rule.preyPlantSpeciesId());
-    }
-
-    private record FeedingRuleKey(
-            Integer speciesId,
-            Integer preySpeciesId,
-            Integer preyPlantSpeciesId
-    ) {
     }
 }
