@@ -1,9 +1,9 @@
 package com.example.animalworld.controller;
 
 import com.example.animalworld.model.dto.WorldRuntimeSummaryDto;
-import com.example.animalworld.runtime.simulation.domain.world.SimulationWorld;
+import com.example.animalworld.simulation.domain.world.SimulationWorld;
 import com.example.animalworld.scheduler.SimulationWorldRegistry;
-import com.example.animalworld.runtime.simulation.service.SimulationWorldBootstrapService;
+import com.example.animalworld.simulation.service.SimulationWorldBootstrapService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;

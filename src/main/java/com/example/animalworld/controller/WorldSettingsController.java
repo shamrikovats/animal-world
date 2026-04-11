@@ -3,7 +3,7 @@ package com.example.animalworld.controller;
 import com.example.animalworld.mapper.WorldConfigurationMapper;
 import com.example.animalworld.model.dto.WorldSettingsDto;
 import com.example.animalworld.model.dto.WorldSettingsPatchDto;
-import com.example.animalworld.service.WorldConfigurationService;
+import com.example.animalworld.facade.WorldConfigurationService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 

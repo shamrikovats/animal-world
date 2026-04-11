@@ -1,6 +1,6 @@
 package com.example.animalworld.scheduler;
 
-import com.example.animalworld.runtime.simulation.domain.world.SimulationWorld;
+import com.example.animalworld.simulation.domain.world.SimulationWorld;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;

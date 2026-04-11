@@ -1,7 +1,7 @@
 package com.example.animalworld.executor;
 
-import com.example.animalworld.runtime.simulation.domain.world.SimulationWorld;
-import com.example.animalworld.runtime.simulation.domain.world.SimulationCell;
+import com.example.animalworld.simulation.domain.world.SimulationWorld;
+import com.example.animalworld.simulation.domain.world.SimulationCell;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 

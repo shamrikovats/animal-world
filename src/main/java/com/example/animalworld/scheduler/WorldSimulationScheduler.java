@@ -2,9 +2,10 @@ package com.example.animalworld.scheduler;
 
 import com.example.animalworld.model.WorldStatus;
 import com.example.animalworld.repository.WorldRepository;
-import com.example.animalworld.runtime.simulation.domain.world.SimulationWorld;
+import com.example.animalworld.simulation.domain.world.SimulationWorld;
+import com.example.animalworld.simulation.engine.WorldPopulationSnapshot;
 import com.example.animalworld.job.WorldTickJob;
-import com.example.animalworld.runtime.simulation.service.SimulationWorldBootstrapService;
+import com.example.animalworld.simulation.service.SimulationWorldBootstrapService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -71,7 +72,12 @@ public class WorldSimulationScheduler {
 
     private void runTick(SimulationWorld world) {
         try {
-            worldTickJob.run(world);
+            WorldPopulationSnapshot snapshot = worldTickJob.run(world);
+            if (snapshot.totalAnimals() == 0) {
+                log.info("World {} stopped automatically because no animals are alive", world.worldId());
+                stopWorld(world.worldId());
+                worldRepository.updateStatus(world.worldId(), WorldStatus.INACTIVE);
+            }
         } catch (Exception exception) {
             log.error("Simulation tick failed for world {}", world.worldId(), exception);
             stopWorld(world.worldId());

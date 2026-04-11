@@ -1,7 +1,8 @@
 package com.example.animalworld.job;
 
-import com.example.animalworld.runtime.simulation.domain.world.SimulationWorld;
-import com.example.animalworld.runtime.simulation.engine.SimulationTickEngine;
+import com.example.animalworld.simulation.domain.world.SimulationWorld;
+import com.example.animalworld.simulation.engine.WorldPopulationSnapshot;
+import com.example.animalworld.simulation.engine.SimulationTickEngine;
 import org.springframework.stereotype.Component;
 
 /**
@@ -18,7 +19,7 @@ public class WorldTickJob {
         this.tickEngine = tickEngine;
     }
 
-    public void run(SimulationWorld world) {
-        tickEngine.executeTick(world);
+    public WorldPopulationSnapshot run(SimulationWorld world) {
+        return tickEngine.executeTick(world);
     }
 }
