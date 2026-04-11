@@ -3,6 +3,7 @@ package com.example.animalworld.runtime.simulation.domain.world;
 import com.example.animalworld.model.WorldStatus;
 import com.example.animalworld.runtime.simulation.domain.config.RuntimeFeedingRule;
 import com.example.animalworld.runtime.simulation.domain.config.RuntimeFeedingRuleKey;
+import com.example.animalworld.runtime.simulation.domain.config.RuntimeLocationRule;
 import com.example.animalworld.runtime.simulation.domain.config.RuntimePlantConfig;
 import com.example.animalworld.runtime.simulation.domain.config.RuntimeSpeciesConfig;
 import com.example.animalworld.runtime.simulation.domain.config.RuntimeWorldSettings;
@@ -25,6 +26,7 @@ public class SimulationWorld {
     private final Map<Integer, RuntimeSpeciesConfig> speciesConfigsById;
     private final Map<Integer, RuntimePlantConfig> plantConfigsById;
     private final Map<RuntimeFeedingRuleKey, RuntimeFeedingRule> feedingRulesByKey;
+    private final Map<Integer, Map<LocationType, RuntimeLocationRule>> locationRulesBySpeciesId;
     private final AtomicLong currentTick = new AtomicLong();
 
     private WorldStatus status;
@@ -38,7 +40,8 @@ public class SimulationWorld {
             WorldStatus status,
             Map<Integer, RuntimeSpeciesConfig> speciesConfigsById,
             Map<Integer, RuntimePlantConfig> plantConfigsById,
-            Map<RuntimeFeedingRuleKey, RuntimeFeedingRule> feedingRulesByKey
+            Map<RuntimeFeedingRuleKey, RuntimeFeedingRule> feedingRulesByKey,
+            Map<Integer, Map<LocationType, RuntimeLocationRule>> locationRulesBySpeciesId
     ) {
         this.worldId = worldId;
         this.worldName = worldName;
@@ -49,6 +52,7 @@ public class SimulationWorld {
         this.speciesConfigsById = Map.copyOf(speciesConfigsById);
         this.plantConfigsById = Map.copyOf(plantConfigsById);
         this.feedingRulesByKey = Map.copyOf(feedingRulesByKey);
+        this.locationRulesBySpeciesId = Map.copyOf(locationRulesBySpeciesId);
     }
 
     public Integer worldId() {
@@ -95,6 +99,20 @@ public class SimulationWorld {
 
     public Map<RuntimeFeedingRuleKey, RuntimeFeedingRule> feedingRulesByKey() {
         return feedingRulesByKey;
+    }
+
+    public boolean canEnter(Integer speciesId, LocationType locationType) {
+        RuntimeLocationRule rule = locationRulesBySpeciesId
+                .getOrDefault(speciesId, Map.of())
+                .get(locationType);
+        return rule == null || !rule.forbidden();
+    }
+
+    public int survivalModifier(Integer speciesId, LocationType locationType) {
+        RuntimeLocationRule rule = locationRulesBySpeciesId
+                .getOrDefault(speciesId, Map.of())
+                .get(locationType);
+        return rule == null ? 0 : rule.survivalModifier();
     }
 
     public long currentTick() {

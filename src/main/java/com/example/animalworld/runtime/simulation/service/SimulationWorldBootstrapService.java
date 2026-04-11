@@ -1,10 +1,12 @@
 package com.example.animalworld.runtime.simulation.service;
 
 import com.example.animalworld.model.entity.*;
+import com.example.animalworld.repository.BaseLocationRuleRepository;
 import com.example.animalworld.repository.LocationTypeRepository;
 import com.example.animalworld.runtime.simulation.domain.base.AnimalSpawnState;
 import com.example.animalworld.runtime.simulation.domain.config.RuntimeFeedingRule;
 import com.example.animalworld.runtime.simulation.domain.config.RuntimeFeedingRuleKey;
+import com.example.animalworld.runtime.simulation.domain.config.RuntimeLocationRule;
 import com.example.animalworld.runtime.simulation.domain.config.RuntimePlantConfig;
 import com.example.animalworld.runtime.simulation.domain.config.RuntimeSpeciesConfig;
 import com.example.animalworld.runtime.simulation.domain.config.RuntimeWorldSettings;
@@ -30,7 +32,7 @@ import java.util.Random;
 /**
  * Сервис, который поднимает runtime-мир из данных БД.
  * Он собирает настройки, строит клетки и создает стартовую популяцию животных и растений.
- *
+ * TODO Он мне не нравится, когда-нибудь разбить на утилитарные классы
  * @author Shamrikova Tatiana
  */
 @Service
@@ -38,6 +40,7 @@ public class SimulationWorldBootstrapService {
     private final WorldLookupService worldLookupService;
     private final WorldConfigurationService worldConfigurationService;
     private final ReferenceDataService referenceDataService;
+    private final BaseLocationRuleRepository baseLocationRuleRepository;
     private final LocationTypeRepository locationTypeRepository;
     private final AnimalFactory animalFactory;
     private final RuntimeIdGenerator runtimeIdGenerator;
@@ -46,6 +49,7 @@ public class SimulationWorldBootstrapService {
             WorldLookupService worldLookupService,
             WorldConfigurationService worldConfigurationService,
             ReferenceDataService referenceDataService,
+            BaseLocationRuleRepository baseLocationRuleRepository,
             LocationTypeRepository locationTypeRepository,
             AnimalFactory animalFactory,
             RuntimeIdGenerator runtimeIdGenerator
@@ -53,6 +57,7 @@ public class SimulationWorldBootstrapService {
         this.worldLookupService = worldLookupService;
         this.worldConfigurationService = worldConfigurationService;
         this.referenceDataService = referenceDataService;
+        this.baseLocationRuleRepository = baseLocationRuleRepository;
         this.locationTypeRepository = locationTypeRepository;
         this.animalFactory = animalFactory;
         this.runtimeIdGenerator = runtimeIdGenerator;
@@ -72,6 +77,7 @@ public class SimulationWorldBootstrapService {
         Map<Integer, RuntimeSpeciesConfig> speciesConfigsById = toRuntimeSpeciesConfigs(speciesConfigurations, speciesById);
         Map<Integer, RuntimePlantConfig> plantConfigsById = toRuntimePlantConfigs(plantConfigurations, plantSpeciesById);
         Map<RuntimeFeedingRuleKey, RuntimeFeedingRule> feedingRulesByKey = toRuntimeFeedingRules(feedingRules);
+        Map<Integer, Map<LocationType, RuntimeLocationRule>> locationRulesBySpeciesId = toRuntimeLocationRules();
 
         List<LocationType> locationTypes = locationTypeRepository.findAllNames().stream()
                 .map(LocationType::fromDatabaseName)
@@ -87,7 +93,8 @@ public class SimulationWorldBootstrapService {
                 world.status(),
                 speciesConfigsById,
                 plantConfigsById,
-                feedingRulesByKey
+                feedingRulesByKey,
+                locationRulesBySpeciesId
         );
 
         populateAnimals(simulationWorld);
@@ -125,6 +132,8 @@ public class SimulationWorldBootstrapService {
                     configuration.worldId(),
                     configuration.speciesId(),
                     species.name(),
+                    species.predator(),
+                    species.herbivore(),
                     configuration.maxCoexistCount(),
                     configuration.weight(),
                     configuration.speedCells(),
@@ -179,6 +188,23 @@ public class SimulationWorldBootstrapService {
         return result;
     }
 
+    private Map<Integer, Map<LocationType, RuntimeLocationRule>> toRuntimeLocationRules() {
+        Map<Integer, Map<LocationType, RuntimeLocationRule>> result = new LinkedHashMap<>();
+        for (BaseLocationRule rule : baseLocationRuleRepository.findAll()) {
+            LocationType locationType = LocationType.fromDatabaseName(rule.locationName());
+            result.computeIfAbsent(rule.speciesId(), ignored -> new LinkedHashMap<>())
+                    .put(
+                            locationType,
+                            new RuntimeLocationRule(
+                                    rule.speciesId(),
+                                    locationType,
+                                    rule.survivalModifier()
+                            )
+                    );
+        }
+        return result;
+    }
+
     private SimulationCell[][] buildCells(RuntimeWorldSettings settings, List<LocationType> locationTypes, Integer worldId) {
         if (locationTypes.isEmpty()) {
             throw new IllegalStateException("No location types configured in database");
@@ -221,9 +247,10 @@ public class SimulationWorldBootstrapService {
         int fallbackPlantCount = Math.max(1, simulationWorld.settings().startPlantsMass());
         for (RuntimePlantConfig configuration : plantConfigs) {
             int plantCount = configuration.startCount() > 0 ? configuration.startCount() : fallbackPlantCount;
+            int targetPlantsPerCell = targetPlantsPerCell(plantCount, cells.size());
             Random random = new Random(seed(simulationWorld.worldId(), configuration.plantSpeciesId()));
             for (int i = 0; i < plantCount; i++) {
-                SimulationCell cell = cells.get(random.nextInt(cells.size()));
+                SimulationCell cell = selectCellForPlant(cells, configuration, targetPlantsPerCell, random);
                 cell.addPlant(new Plant(runtimeIdGenerator.nextId(), configuration));
             }
         }
@@ -251,7 +278,27 @@ public class SimulationWorldBootstrapService {
     }
 
     private double initialSatiety(RuntimeWorldSettings worldSettings, RuntimeSpeciesConfig configuration) {
-        return configuration.fullTankWeight() * (100 - worldSettings.startHungryPercent()) / 100.0;
+        return configuration.effectiveFullTankWeight() * (100 - worldSettings.startHungryPercent()) / 100.0;
+    }
+
+    private SimulationCell selectCellForPlant(
+            List<SimulationCell> cells,
+            RuntimePlantConfig configuration,
+            int targetPlantsPerCell,
+            Random random
+    ) {
+        int startIndex = random.nextInt(cells.size());
+        for (int offset = 0; offset < cells.size(); offset++) {
+            SimulationCell cell = cells.get((startIndex + offset) % cells.size());
+            if (cell.plantCount(configuration.plantSpeciesId()) < targetPlantsPerCell) {
+                return cell;
+            }
+        }
+        return cells.get(random.nextInt(cells.size()));
+    }
+
+    private int targetPlantsPerCell(int totalPlantCount, int cellCount) {
+        return Math.max(1, (int) Math.ceil((double) totalPlantCount / cellCount));
     }
 
     private long seed(Integer worldId, Integer entityId) {

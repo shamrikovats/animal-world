@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Supplier;
 
 /**
  * Одна клетка мира в памяти.
@@ -46,6 +47,24 @@ public class SimulationCell {
         return lock;
     }
 
+    public void withLock(Runnable action) {
+        lock.lock();
+        try {
+            action.run();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public <T> T withLock(Supplier<T> action) {
+        lock.lock();
+        try {
+            return action.get();
+        } finally {
+            lock.unlock();
+        }
+    }
+
     public boolean canAcceptAnimal(RuntimeSpeciesConfig configuration) {
         return animalsBySpecies.getOrDefault(configuration.speciesId(), List.of()).size() < configuration.maxCoexistCount();
     }
@@ -71,6 +90,12 @@ public class SimulationCell {
 
     public void removePlant(Plant plant) {
         plants.remove(plant);
+    }
+
+    public int plantCount(Integer plantSpeciesId) {
+        return (int) plants.stream()
+                .filter(plant -> plant.plantSpeciesId().equals(plantSpeciesId))
+                .count();
     }
 
     public List<Plant> plantsSnapshot() {

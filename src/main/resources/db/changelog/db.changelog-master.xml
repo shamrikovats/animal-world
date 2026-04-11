@@ -7,6 +7,5 @@
 
     <include file="db/changelog/changes/001-create-animal-species.sql"/>
     <include file="db/changelog/changes/002-world-configuration-defaults.sql"/>
-    <include file="db/changelog/changes/003-fix-species-configuration-constraints.sql"/>
 
 </databaseChangeLog>

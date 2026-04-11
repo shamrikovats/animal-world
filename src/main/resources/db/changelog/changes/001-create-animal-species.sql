@@ -71,11 +71,11 @@ CREATE TABLE IF NOT EXISTS species_configuration
     CHECK (max_coexist_count >= 0),
     CHECK (weight > 0),
     CHECK (speed_cells >= 0),
-    CHECK (full_tank_weight > 0),
+    CHECK (full_tank_weight >= 0),
     CHECK (min_food_percent >= 0 AND min_food_percent <= 100),
     CHECK (max_children_count > 0),
     CHECK (pregnancy_period > 0),
-    CHECK (lost_food_for_tick > 10)
+    CHECK (lost_food_for_tick >= 0)
 );
 
 CREATE TABLE IF NOT EXISTS world_plant_species

@@ -7,6 +7,7 @@ import com.example.animalworld.model.entity.SpeciesConfiguration;
 import com.example.animalworld.model.entity.World;
 import com.example.animalworld.model.entity.WorldSettings;
 import com.example.animalworld.repository.WorldRepository;
+import com.example.animalworld.scheduler.WorldSimulationScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -24,15 +25,18 @@ public class WorldLifecycleService {
     private final WorldRepository worldRepository;
     private final WorldLookupService worldLookupService;
     private final WorldConfigurationService worldConfigurationService;
+    private final WorldSimulationScheduler worldSimulationScheduler;
 
     WorldLifecycleService(
             WorldRepository worldRepository,
             WorldLookupService worldLookupService,
-            WorldConfigurationService worldConfigurationService
+            WorldConfigurationService worldConfigurationService,
+            WorldSimulationScheduler worldSimulationScheduler
     ) {
         this.worldRepository = worldRepository;
         this.worldLookupService = worldLookupService;
         this.worldConfigurationService = worldConfigurationService;
+        this.worldSimulationScheduler = worldSimulationScheduler;
     }
 
     @Transactional
@@ -63,6 +67,18 @@ public class WorldLifecycleService {
         } else {
             worldLookupService.findById(worldId);
         }
-        return worldRepository.updateStatus(worldId, status).orElseThrow();
+        World updatedWorld = worldRepository.updateStatus(worldId, status).orElseThrow();
+        if (status == WorldStatus.ACTIVE) {
+            try {
+                worldSimulationScheduler.startWorld(worldId);
+            } catch (RuntimeException exception) {
+                worldRepository.updateStatus(worldId, WorldStatus.INACTIVE);
+                throw exception;
+            }
+        }
+        if (status == WorldStatus.INACTIVE) {
+            worldSimulationScheduler.stopWorld(worldId);
+        }
+        return updatedWorld;
     }
 }

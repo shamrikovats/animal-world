@@ -48,10 +48,10 @@ CREATE TABLE IF NOT EXISTS default_world_settings
     tick_duration          INTEGER NOT NULL DEFAULT 1000,
     height                 INTEGER NOT NULL DEFAULT 10,
     width                  INTEGER NOT NULL DEFAULT 10,
-    start_hungry_percent   INTEGER NOT NULL DEFAULT 20,
-    start_predator_counter INTEGER NOT NULL DEFAULT 10,
-    start_herbivore_counter INTEGER NOT NULL DEFAULT 20,
-    start_plants_mass      INTEGER NOT NULL DEFAULT 100,
+    start_hungry_percent   INTEGER NOT NULL DEFAULT 10,
+    start_predator_counter INTEGER NOT NULL DEFAULT 5,
+    start_herbivore_counter INTEGER NOT NULL DEFAULT 30,
+    start_plants_mass      INTEGER NOT NULL DEFAULT 400,
     CHECK (id = 1),
     CHECK (tick_duration > 0),
     CHECK (height > 0),
@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS default_species_configuration
     min_food_percent    INTEGER NOT NULL DEFAULT 20,
     max_children_count  INTEGER NOT NULL DEFAULT 1,
     pregnancy_period    INTEGER NOT NULL DEFAULT 1,
-    lost_food_for_tick  INTEGER NOT NULL DEFAULT 40,
+    lost_food_for_tick  INTEGER NOT NULL DEFAULT 15,
     start_count         INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (species_id) REFERENCES species (id) ON DELETE CASCADE,
     CHECK (max_coexist_count >= 0),
@@ -89,9 +89,9 @@ CREATE TABLE IF NOT EXISTS default_species_configuration
 CREATE TABLE IF NOT EXISTS default_plant_species_configuration
 (
     plant_species_id   INTEGER PRIMARY KEY,
-    max_repair_speed   INTEGER NOT NULL DEFAULT 1,
+    max_repair_speed   INTEGER NOT NULL DEFAULT 3,
     weight             INTEGER NOT NULL DEFAULT 1,
-    start_count        INTEGER NOT NULL DEFAULT 100,
+    start_count        INTEGER NOT NULL DEFAULT 400,
     FOREIGN KEY (plant_species_id) REFERENCES plant_species (id) ON DELETE CASCADE,
     CHECK (max_repair_speed >= 0),
     CHECK (weight > 0),
@@ -156,7 +156,7 @@ INSERT INTO default_world_settings (
     start_herbivore_counter,
     start_plants_mass
 )
-VALUES (1, 1000, 10, 10, 20, 10, 20, 100)
+VALUES (1, 1000, 10, 10, 10, 5, 30, 400)
 ON CONFLICT (id) DO UPDATE
 SET tick_duration = EXCLUDED.tick_duration,
     height = EXCLUDED.height,
@@ -190,21 +190,21 @@ SELECT s.id,
        cfg.start_count
 FROM (
     VALUES
-        ('Wolf', 30, 50.0, 3, 8.0, 20, 1, 1, 40, 5),
-        ('Snake', 30, 15.0, 1, 3.0, 20, 1, 1, 40, 5),
-        ('Fox', 30, 8.0, 2, 2.0, 20, 1, 1, 40, 5),
-        ('Bear', 5, 500.0, 2, 80.0, 20, 1, 1, 40, 2),
-        ('Eagle', 20, 6.0, 3, 1.0, 20, 1, 1, 40, 4),
-        ('Horse', 20, 400.0, 4, 60.0, 20, 1, 1, 40, 10),
-        ('Deer', 20, 300.0, 4, 50.0, 20, 1, 1, 40, 10),
-        ('Rabbit', 150, 2.0, 2, 0.45, 20, 1, 1, 40, 20),
-        ('Mouse', 500, 0.05, 1, 0.01, 20, 1, 1, 40, 20),
-        ('Goat', 140, 60.0, 3, 10.0, 20, 1, 1, 40, 12),
-        ('Sheep', 140, 70.0, 3, 15.0, 20, 1, 1, 40, 12),
-        ('Boar', 50, 400.0, 2, 50.0, 20, 1, 1, 40, 10),
-        ('Buffalo', 10, 700.0, 3, 100.0, 20, 1, 1, 40, 8),
-        ('Duck', 200, 1.0, 4, 0.15, 20, 1, 1, 40, 15),
-        ('Caterpillar', 1000, 0.01, 0, 0.0, 20, 1, 1, 40, 30)
+        ('Wolf', 30, 50.0, 3, 8.0, 20, 2, 3, 18, 3),
+        ('Snake', 30, 15.0, 1, 3.0, 20, 2, 3, 18, 3),
+        ('Fox', 30, 8.0, 2, 2.0, 20, 3, 2, 15, 4),
+        ('Bear', 5, 500.0, 2, 80.0, 20, 1, 4, 12, 1),
+        ('Eagle', 20, 6.0, 3, 1.0, 20, 2, 2, 18, 3),
+        ('Horse', 20, 400.0, 4, 60.0, 20, 1, 4, 12, 4),
+        ('Deer', 20, 300.0, 4, 50.0, 20, 2, 4, 12, 6),
+        ('Rabbit', 150, 2.0, 2, 0.45, 20, 4, 2, 18, 24),
+        ('Mouse', 500, 0.05, 1, 0.01, 20, 5, 2, 20, 30),
+        ('Goat', 140, 60.0, 3, 10.0, 20, 2, 3, 15, 8),
+        ('Sheep', 140, 70.0, 3, 15.0, 20, 2, 3, 15, 8),
+        ('Boar', 50, 400.0, 2, 50.0, 20, 3, 3, 15, 6),
+        ('Buffalo', 10, 700.0, 3, 100.0, 20, 1, 5, 11, 3),
+        ('Duck', 200, 1.0, 4, 0.15, 20, 4, 2, 18, 18),
+        ('Caterpillar', 1000, 0.01, 0, 0.0, 20, 6, 1, 5, 50)
 ) AS cfg(name, max_coexist_count, weight, speed_cells, full_tank_weight, min_food_percent, max_children_count, pregnancy_period, lost_food_for_tick, start_count)
 JOIN species s ON s.name = cfg.name
 ON CONFLICT (species_id) DO UPDATE
@@ -224,7 +224,7 @@ INSERT INTO default_plant_species_configuration (
     weight,
     start_count
 )
-SELECT id, 1, 1, 100
+SELECT id, 3, 1, 400
 FROM plant_species
 WHERE biological_name = 'Plant'
 ON CONFLICT (plant_species_id) DO UPDATE
