@@ -2,6 +2,7 @@ package com.example.animalworld.controller;
 
 import com.example.animalworld.model.dto.WorldRuntimeSummaryDto;
 import com.example.animalworld.runtime.simulation.domain.world.SimulationWorld;
+import com.example.animalworld.scheduler.SimulationWorldRegistry;
 import com.example.animalworld.runtime.simulation.service.SimulationWorldBootstrapService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,14 +19,19 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/worlds/{worldId}/runtime")
 public class WorldRuntimeController {
     private final SimulationWorldBootstrapService bootstrapService;
+    private final SimulationWorldRegistry registry;
 
-    WorldRuntimeController(SimulationWorldBootstrapService bootstrapService) {
+    WorldRuntimeController(
+            SimulationWorldBootstrapService bootstrapService,
+            SimulationWorldRegistry registry
+    ) {
         this.bootstrapService = bootstrapService;
+        this.registry = registry;
     }
 
     @GetMapping("/summary")
     public WorldRuntimeSummaryDto getRuntimeSummary(@PathVariable Integer worldId) {
-        SimulationWorld world = bootstrapService.bootstrap(worldId);
+        SimulationWorld world = registry.findWorld(worldId).orElseGet(() -> bootstrapService.bootstrap(worldId));
         int totalAnimals = world.allCells().stream()
                 .mapToInt(cell -> cell.animalsSnapshot().size())
                 .sum();

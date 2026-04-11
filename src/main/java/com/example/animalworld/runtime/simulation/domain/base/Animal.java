@@ -5,9 +5,10 @@ import com.example.animalworld.runtime.simulation.domain.dictionary.MovementDire
 import com.example.animalworld.runtime.simulation.domain.dictionary.Sex;
 import com.example.animalworld.runtime.simulation.domain.config.RuntimeSpeciesConfig;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.LongSupplier;
 
 /**
  * Базовый runtime-класс любого животного в симуляции.
@@ -23,6 +24,7 @@ public abstract class Animal implements Consumable {
 
     private boolean alive;
     private boolean pregnant;
+    private boolean ateThisTick;
     private int pregnancyRemainingTicks;
     private double satiety;
 
@@ -32,8 +34,9 @@ public abstract class Animal implements Consumable {
         this.sex = spawnState.sex();
         this.alive = spawnState.alive();
         this.pregnant = spawnState.pregnant();
+        this.ateThisTick = false;
         this.pregnancyRemainingTicks = spawnState.pregnancyRemainingTicks();
-        this.satiety = Math.min(spawnState.satiety(), configuration.fullTankWeight());
+        this.satiety = Math.min(spawnState.satiety(), configuration.effectiveFullTankWeight());
     }
 
     public long runtimeId() {
@@ -73,11 +76,24 @@ public abstract class Animal implements Consumable {
     }
 
     public double hungerPercent() {
-        double fullTankWeight = configuration.fullTankWeight();
-        if (fullTankWeight <= 0) {
-            return 0;
-        }
+        double fullTankWeight = configuration.effectiveFullTankWeight();
         return Math.max(0, ((fullTankWeight - satiety) / fullTankWeight) * 100);
+    }
+
+    public double foodPercent() {
+        return Math.max(0, 100 - hungerPercent());
+    }
+
+    public boolean needsFood() {
+        return alive && satiety < configuration.effectiveFullTankWeight();
+    }
+
+    public boolean ateThisTick() {
+        return ateThisTick;
+    }
+
+    public void prepareForTick() {
+        ateThisTick = false;
     }
 
     public boolean eat(Consumable consumable) {
@@ -90,25 +106,30 @@ public abstract class Animal implements Consumable {
             return false;
         }
 
-        satiety = Math.min(configuration.fullTankWeight(), satiety + nutrition);
+        satiety = Math.min(configuration.effectiveFullTankWeight(), satiety + nutrition);
+        ateThisTick = true;
         return true;
     }
 
-    public Optional<Animal> reproduce(long offspringRuntimeId) {
+    public List<Animal> reproduce(int offspringCount, LongSupplier runtimeIdSupplier) {
         if (!alive || sex != Sex.FEMALE || !pregnant || pregnancyRemainingTicks > 0) {
-            return Optional.empty();
+            return List.of();
         }
 
         pregnant = false;
-        AnimalSpawnState offspringState = new AnimalSpawnState(
-                offspringRuntimeId,
-                randomSex(),
-                configuration.fullTankWeight() * 0.5,
-                true,
-                false,
-                0
-        );
-        return Optional.of(createOffspring(offspringState));
+        List<Animal> offspring = new ArrayList<>(offspringCount);
+        for (int i = 0; i < offspringCount; i++) {
+            AnimalSpawnState offspringState = new AnimalSpawnState(
+                    runtimeIdSupplier.getAsLong(),
+                    randomSex(),
+                    configuration.effectiveFullTankWeight() * 0.5,
+                    true,
+                    false,
+                    0
+            );
+            offspring.add(createOffspring(offspringState));
+        }
+        return List.copyOf(offspring);
     }
 
     public MovementDirection chooseMoveDirection(List<MovementDirection> availableDirections) {
@@ -126,6 +147,7 @@ public abstract class Animal implements Consumable {
         alive = false;
         satiety = 0;
         pregnant = false;
+        ateThisTick = false;
         pregnancyRemainingTicks = 0;
     }
 
@@ -143,7 +165,8 @@ public abstract class Animal implements Consumable {
     }
 
     public void loseSatietyForTick() {
-        satiety = Math.max(0, satiety - configuration.lostFoodForTick());
+        double satietyLoss = configuration.effectiveFullTankWeight() * configuration.lostFoodForTick() / 100.0;
+        satiety = Math.max(0, satiety - satietyLoss);
         if (satiety <= 0) {
             markDead();
         }

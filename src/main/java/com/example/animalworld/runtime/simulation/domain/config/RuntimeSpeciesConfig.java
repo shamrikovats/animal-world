@@ -10,6 +10,8 @@ public record RuntimeSpeciesConfig(
         Integer worldId,
         Integer speciesId,
         String speciesName,
+        boolean predator,
+        boolean herbivore,
         Integer maxCoexistCount,
         Double weight,
         Integer speedCells,
@@ -20,4 +22,13 @@ public record RuntimeSpeciesConfig(
         Integer lostFoodForTick,
         Integer startCount
 ) {
+    public double effectiveFullTankWeight() {
+        if (fullTankWeight != null && fullTankWeight > 0) {
+            return fullTankWeight;
+        }
+        if (weight != null && weight > 0) {
+            return weight;
+        }
+        return 1.0;
+    }
 }
