@@ -1,5 +1,7 @@
 package com.example.animalworld.facade;
 
+import com.example.animalworld.facade.configuration.WorldConfigurationSnapshot;
+import com.example.animalworld.facade.configuration.WorldConfigurationSnapshotLoader;
 import com.example.animalworld.model.entity.FeedingRule;
 import com.example.animalworld.model.entity.PlantSpeciesConfiguration;
 import com.example.animalworld.model.entity.SpeciesConfiguration;
@@ -25,6 +27,7 @@ public class WorldConfigurationService {
     private final SpeciesConfigurationRepository speciesConfigurationRepository;
     private final PlantSpeciesConfigurationRepository plantSpeciesConfigurationRepository;
     private final FeedingRuleRepository feedingRuleRepository;
+    private final WorldConfigurationSnapshotLoader snapshotLoader;
     private final WorldConfigurationMergeService mergeService;
     private final WorldConfigurationValidationService validationService;
 
@@ -34,6 +37,7 @@ public class WorldConfigurationService {
             SpeciesConfigurationRepository speciesConfigurationRepository,
             PlantSpeciesConfigurationRepository plantSpeciesConfigurationRepository,
             FeedingRuleRepository feedingRuleRepository,
+            WorldConfigurationSnapshotLoader snapshotLoader,
             WorldConfigurationMergeService mergeService,
             WorldConfigurationValidationService validationService
     ) {
@@ -42,6 +46,7 @@ public class WorldConfigurationService {
         this.speciesConfigurationRepository = speciesConfigurationRepository;
         this.plantSpeciesConfigurationRepository = plantSpeciesConfigurationRepository;
         this.feedingRuleRepository = feedingRuleRepository;
+        this.snapshotLoader = snapshotLoader;
         this.mergeService = mergeService;
         this.validationService = validationService;
     }
@@ -56,43 +61,39 @@ public class WorldConfigurationService {
     ) {
         worldLookupService.findById(worldId);
         validateConfigurationPatches(speciesConfigurationPatches, plantConfigurationPatches, feedingRulePatches);
+        WorldConfigurationSnapshot defaultConfiguration = snapshotLoader.loadDefaults();
 
-        WorldSettings settings = mergeService.mergeSettings(worldSettingsRepository.findDefault(), settingsPatch, worldId);
+        WorldSettings settings = mergeService.mergeSettings(defaultConfiguration.settings(), settingsPatch, worldId);
         List<SpeciesConfiguration> speciesConfigurations = mergeService.mergeSpeciesConfigurations(
-                speciesConfigurationRepository.findAllDefaults(), speciesConfigurationPatches, worldId
+                defaultConfiguration.speciesConfigurations(), speciesConfigurationPatches, worldId
         );
         List<PlantSpeciesConfiguration> plantConfigurations = mergeService.mergePlantConfigurations(
-                plantSpeciesConfigurationRepository.findAllDefaults(), plantConfigurationPatches, worldId
+                defaultConfiguration.plantConfigurations(), plantConfigurationPatches, worldId
         );
         List<FeedingRule> feedingRules = mergeService.mergeFeedingRules(
-                feedingRuleRepository.findAllDefaults(), feedingRulePatches, worldId
+                defaultConfiguration.feedingRules(), feedingRulePatches, worldId
         );
 
-        saveConfiguration(worldId, settings, speciesConfigurations, plantConfigurations, feedingRules);
+        saveConfiguration(
+                worldId,
+                new WorldConfigurationSnapshot(settings, speciesConfigurations, plantConfigurations, feedingRules)
+        );
     }
 
     @Transactional
     public void ensureMaterialized(Integer worldId) {
         worldLookupService.findById(worldId);
-
-        WorldSettings existingSettings = worldSettingsRepository.findByWorldId(worldId).orElse(null);
-        List<SpeciesConfiguration> existingSpecies = speciesConfigurationRepository.findAllByWorldId(worldId);
-        List<PlantSpeciesConfiguration> existingPlants = plantSpeciesConfigurationRepository.findAllByWorldId(worldId);
-        List<FeedingRule> existingFeedingRules = feedingRuleRepository.findAllByWorldId(worldId);
-
-        if (existingSettings != null
-                && !existingSpecies.isEmpty()
-                && !existingPlants.isEmpty()
-                && !existingFeedingRules.isEmpty()) {
+        WorldConfigurationSnapshot currentConfiguration = snapshotLoader.loadForWorld(worldId);
+        if (currentConfiguration.isComplete()) {
             return;
         }
 
         materializeWorldConfiguration(
                 worldId,
-                existingSettings,
-                existingSpecies,
-                existingPlants,
-                existingFeedingRules
+                currentConfiguration.settings(),
+                currentConfiguration.speciesConfigurations(),
+                currentConfiguration.plantConfigurations(),
+                currentConfiguration.feedingRules()
         );
     }
 
@@ -164,17 +165,11 @@ public class WorldConfigurationService {
         return feedingRuleRepository.findAllByWorldId(worldId);
     }
 
-    private void saveConfiguration(
-            Integer worldId,
-            WorldSettings settings,
-            List<SpeciesConfiguration> speciesConfigurations,
-            List<PlantSpeciesConfiguration> plantConfigurations,
-            List<FeedingRule> feedingRules
-    ) {
-        worldSettingsRepository.upsert(settings);
-        speciesConfigurationRepository.replaceAllForWorld(worldId, speciesConfigurations);
-        plantSpeciesConfigurationRepository.replaceAllForWorld(worldId, plantConfigurations);
-        feedingRuleRepository.replaceAllForWorld(worldId, feedingRules);
+    private void saveConfiguration(Integer worldId, WorldConfigurationSnapshot configuration) {
+        worldSettingsRepository.upsert(configuration.settings());
+        speciesConfigurationRepository.replaceAllForWorld(worldId, configuration.speciesConfigurations());
+        plantSpeciesConfigurationRepository.replaceAllForWorld(worldId, configuration.plantConfigurations());
+        feedingRuleRepository.replaceAllForWorld(worldId, configuration.feedingRules());
     }
 
     private void validateConfigurationPatches(

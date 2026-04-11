@@ -89,6 +89,12 @@ public class SimulationWorld {
         return result;
     }
 
+    public int totalPlants() {
+        return allCells().stream()
+                .mapToInt(cell -> cell.plantsSnapshot().size())
+                .sum();
+    }
+
     public Map<Integer, RuntimeSpeciesConfig> speciesConfigsById() {
         return speciesConfigsById;
     }
