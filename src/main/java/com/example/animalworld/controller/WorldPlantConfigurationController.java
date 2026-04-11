@@ -5,7 +5,7 @@ import com.example.animalworld.model.dto.PlantSpeciesConfigurationDto;
 import com.example.animalworld.model.dto.PlantSpeciesConfigurationPatchDto;
 import com.example.animalworld.model.entity.PlantSpecies;
 import com.example.animalworld.service.ReferenceDataService;
-import com.example.animalworld.service.WorldConfigurationService;
+import com.example.animalworld.facade.WorldConfigurationService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
