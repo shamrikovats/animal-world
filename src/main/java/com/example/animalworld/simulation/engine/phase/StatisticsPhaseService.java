@@ -4,6 +4,7 @@ import com.example.animalworld.model.entity.WorldTickStat;
 import com.example.animalworld.simulation.domain.world.SimulationWorld;
 import com.example.animalworld.simulation.engine.TickMetrics;
 import com.example.animalworld.simulation.engine.WorldPopulationSnapshot;
+import com.example.animalworld.simulation.metrics.SimulationMetricsPublisher;
 import com.example.animalworld.service.WorldTickStatService;
 import org.springframework.stereotype.Service;
 
@@ -17,9 +18,14 @@ import org.springframework.stereotype.Service;
 @Service
 public class StatisticsPhaseService {
     private final WorldTickStatService worldTickStatService;
+    private final SimulationMetricsPublisher simulationMetricsPublisher;
 
-    StatisticsPhaseService(WorldTickStatService worldTickStatService) {
+    StatisticsPhaseService(
+            WorldTickStatService worldTickStatService,
+            SimulationMetricsPublisher simulationMetricsPublisher
+    ) {
         this.worldTickStatService = worldTickStatService;
+        this.simulationMetricsPublisher = simulationMetricsPublisher;
     }
 
     public WorldPopulationSnapshot execute(
@@ -39,6 +45,7 @@ public class StatisticsPhaseService {
                 metrics.deaths(),
                 null
         ));
+        simulationMetricsPublisher.recordTick(world, tickNumber, snapshot, metrics);
 
         return snapshot;
     }
