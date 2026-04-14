@@ -120,6 +120,25 @@ http://localhost:8080/api/worlds/8/runtime/summary
 7. Проверить, что данные полетели в графану (в worldId выбрать свой мир)
    http://localhost:3000/d/animalworld-simulation/animalworld-simulation
 
+### Обоснование используемых технологий
+
+- Java 21 потому что была установлена, в 25 было страшно идти).
+- Spring Boot потому что быстро собирает приложение из готовых инфраструктурных блоков без ручной обвязки.
+- Spring Web для REST API, потому что дает стандартный и простой способ поднимать контроллеры.
+- Spring Validation для проверки входных DTO, потому что позволяет отлавливать некорректные данные на входе.
+- Spring Actuator для метрик, потому что дает готовую точку интеграции с observability-инструментами, надо для графаны.
+- Spring JDBC для работы с БД, потому что проекту нужен простой и контролируемый SQL, так как хранение идет там.
+- PostgreSQL основная база данных. Опять же потому что с ней знакома. В реальном проекте еще бы подумала за кликхаус 
+тут дополнительно, потому что по стате постгресс может распухнуть и он для такого не очень.
+- Liquibase используется для миграций схемы, позволяет хранить изменения структуры БД в версии вместе с кодом.
+- Micrometer для публикации метрик приложения, потому что он является стандартным мостом между Spring Boot и Prometheus.
+- Prometheus используется для сбора метрик, в принципе в основном его рекомендовали в статьях.
+- Grafana для визуализации метрик, позволяет быстро строить понятные графики по состоянию мира и симуляции.
+- Docker Compose используется для поднятия инфраструктуры, позволяет воспроизводимо запускать Postgres, Prometheus и
+  Grafana одной командой.
+- Maven используется как система сборки, потому что он стандартен для Spring Boot проектов. Градл пробовала в прошлый раз)
+- OpenAPI используется для Swagger UI, чтобы красиво видеть и работать с рестом.
+
 ### Архитектура приложения (можно открыть в https://editor.plantuml.com/)
 
 @startuml
@@ -136,3 +155,65 @@ skinparam ComponentBorderColor #374151
 skinparam ComponentFontColor #111827
 
 actor "Client\nSwagger / REST" as Client
+
+rectangle "API Layer" as API
+rectangle "Application Layer\nfacades + services" as APP
+database "PostgreSQL" as DB
+
+rectangle "Simulation Runtime" as RUNTIME
+rectangle "Simulation Engine\nphases" as ENGINE
+rectangle "Scheduler & Executors\nworld start/stop + pools" as SCHEDULER
+
+rectangle "Actuator Metrics" as ACTUATOR
+rectangle "Prometheus" as PROM
+rectangle "Grafana" as GRAFANA
+
+Client --> API : REST requests
+API --> APP : use cases
+APP --> DB : read/write config and state
+
+APP --> SCHEDULER : start/stop world
+SCHEDULER --> RUNTIME : build and keep running worlds
+SCHEDULER --> ENGINE : execute next tick
+
+RUNTIME --> ENGINE : world state
+ENGINE --> RUNTIME : update animals, plants,\nworld tick state
+ENGINE --> DB : save tick statistics
+
+ENGINE --> ACTUATOR : publish business metrics
+ACTUATOR --> PROM : expose /actuator/prometheus
+PROM --> GRAFANA : datasource for dashboards
+
+note right of API
+Контроллер. По сути все методы,
+которые видны в сваггере.
+end note
+
+note right of APP
+По сути обеспечение конфигов по миру
+и всего, что делает рест.
+end note
+
+note right of RUNTIME
+Хранение миров в памяти с деталями вне конфигов
+в том числе состояние клеток и животных
+текущее состояние мира тоже тут.
+end note
+
+note right of ENGINE
+Обеспечение логики тика
+Тут происходит проход по фазам
+и обеспечивается многопоточка
+end note
+
+note right of SCHEDULER
+Запускается по переходу мира в ACTIVE,
+Останавливает джобы по переходу в INACTIVE
+По сути тут все управление тиками и задачами.
+end note
+
+note right of GRAFANA
+Отображение графиков по текущему состоянию мира.
+end note
+
+@enduml
