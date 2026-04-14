@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.DoubleAdder;
 /**
  * Публикация бизнес-метрик симуляции в Micrometer.
  * Здесь держим только связку между runtime-миром и метриками, без доменной логики.
+ * TODO вынести названия метрик в отдельный класс констант
  *
  * @author Shamrikova Tatiana
  */

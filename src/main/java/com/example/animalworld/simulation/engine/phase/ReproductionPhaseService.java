@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
  */
 @Service
 public class ReproductionPhaseService {
+    // TODO вынести это в конфиг, сейчас это хардкод потому что не успеваю переработать модель
     private static final int REPRODUCTION_FOOD_THRESHOLD_PERCENT = 60;
 
     private final SimulationParallelSupport parallelSupport;
