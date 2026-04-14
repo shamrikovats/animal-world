@@ -36,4 +36,8 @@ public class SimulationWorldRegistry {
     public Optional<RunningWorldContext> remove(Integer worldId) {
         return Optional.ofNullable(runningWorlds.remove(worldId));
     }
+
+    public int runningWorldCount() {
+        return runningWorlds.size();
+    }
 }

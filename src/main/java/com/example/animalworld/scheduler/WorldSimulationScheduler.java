@@ -4,6 +4,7 @@ import com.example.animalworld.model.WorldStatus;
 import com.example.animalworld.repository.WorldRepository;
 import com.example.animalworld.simulation.domain.world.SimulationWorld;
 import com.example.animalworld.simulation.engine.WorldPopulationSnapshot;
+import com.example.animalworld.simulation.metrics.SimulationMetricsPublisher;
 import com.example.animalworld.job.WorldTickJob;
 import com.example.animalworld.simulation.service.SimulationWorldBootstrapService;
 import org.slf4j.Logger;
@@ -29,19 +30,22 @@ public class WorldSimulationScheduler {
     private final WorldTickJob worldTickJob;
     private final SimulationWorldRegistry registry;
     private final WorldRepository worldRepository;
+    private final SimulationMetricsPublisher simulationMetricsPublisher;
 
     WorldSimulationScheduler(
             @Qualifier("simulationScheduler") ScheduledExecutorService scheduler,
             SimulationWorldBootstrapService bootstrapService,
             WorldTickJob worldTickJob,
             SimulationWorldRegistry registry,
-            WorldRepository worldRepository
+            WorldRepository worldRepository,
+            SimulationMetricsPublisher simulationMetricsPublisher
     ) {
         this.scheduler = scheduler;
         this.bootstrapService = bootstrapService;
         this.worldTickJob = worldTickJob;
         this.registry = registry;
         this.worldRepository = worldRepository;
+        this.simulationMetricsPublisher = simulationMetricsPublisher;
     }
 
     public synchronized void startWorld(Integer worldId) {
@@ -50,6 +54,7 @@ public class WorldSimulationScheduler {
         }
 
         SimulationWorld world = bootstrapService.bootstrap(worldId);
+        simulationMetricsPublisher.markWorldStarted(world);
         RunningWorldContext context = new RunningWorldContext(
                 world,
                 scheduler.scheduleWithFixedDelay(
@@ -67,7 +72,10 @@ public class WorldSimulationScheduler {
     }
 
     public synchronized void stopWorld(Integer worldId) {
-        registry.remove(worldId).ifPresent(context -> context.scheduledTask().cancel(false));
+        registry.remove(worldId).ifPresent(context -> {
+            context.scheduledTask().cancel(false);
+            simulationMetricsPublisher.markWorldStopped(worldId);
+        });
     }
 
     private void runTick(SimulationWorld world) {
@@ -76,6 +84,7 @@ public class WorldSimulationScheduler {
             if (snapshot.totalAnimals() == 0) {
                 log.info("World {} stopped automatically because no animals are alive", world.worldId());
                 stopWorld(world.worldId());
+                simulationMetricsPublisher.markWorldAutoStopped(world.worldId());
                 worldRepository.updateStatus(world.worldId(), WorldStatus.INACTIVE);
             }
         } catch (Exception exception) {
