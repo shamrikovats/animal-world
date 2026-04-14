@@ -19,6 +19,12 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 @Service
 public class PlantGrowthPhaseService {
+    // TODO вынести это в конфиг, сейчас это хардкод потому что не успеваю переработать модель
+    private static final int MIN_GROWTH_CHANCE_PERCENT = 10;
+    private static final int MAX_GROWTH_CHANCE_PERCENT = 100;
+    private static final int REPAIR_SPEED_FACTOR = 15;
+    private static final int DEFICIT_FACTOR = 10;
+
     private final SimulationParallelSupport parallelSupport;
     private final RuntimeIdGenerator runtimeIdGenerator;
 
@@ -49,8 +55,14 @@ public class PlantGrowthPhaseService {
     }
 
     private boolean shouldGrow(RuntimePlantConfig configuration, int deficit) {
-        int chance = Math.min(100, Math.max(10, configuration.maxRepairSpeed() * 15 + (deficit * 10)));
-        return ThreadLocalRandom.current().nextInt(100) < chance;
+        int growthChancePercent = Math.min(
+                MAX_GROWTH_CHANCE_PERCENT,
+                Math.max(
+                        MIN_GROWTH_CHANCE_PERCENT,
+                        configuration.maxRepairSpeed() * REPAIR_SPEED_FACTOR + (deficit * DEFICIT_FACTOR)
+                )
+        );
+        return ThreadLocalRandom.current().nextInt(100) < growthChancePercent;
     }
 
     private int targetPlantsPerCell(RuntimePlantConfig configuration, SimulationWorld world) {
